@@ -1,0 +1,10 @@
+{
+  "video_file": "test.mp4",
+  "fps": 29.949566791672055,
+  "frame_count": 386,
+  "width": 480,
+  "height": 848,
+  "duration_seconds": 12.89,
+  "audio_file": "audio.wav",
+  "frames_folder": "frames"
+}
