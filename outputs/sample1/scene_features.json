@@ -1,0 +1,14 @@
+{
+  "scene_0": {
+    "motion_mean": 6.669,
+    "motion_std": 1.923,
+    "audio_energy": 0.1014,
+    "tempo": 123.05
+  },
+  "scene_1": {
+    "motion_mean": 4.096,
+    "motion_std": 3.526,
+    "audio_energy": 0.1412,
+    "tempo": 123.05
+  }
+}
