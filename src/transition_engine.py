@@ -1,10 +1,12 @@
 import json
-from director_styles import DIRECTOR_STYLES
+
+# ✅ CORRECT ABSOLUTE IMPORT
+from src.director_styles import DIRECTOR_STYLES
 
 
 def classify_scene_context(motion, audio, tempo):
     """
-    Classify scene type based on activity level.
+    Classify scene based on activity level.
     """
     if motion < 0.15 and audio < 0.02:
         return "static_establishing"
@@ -25,7 +27,6 @@ def recommend_transition(scene_feat, scene_emo, style_name):
 
     scene_type = classify_scene_context(motion, audio, tempo)
 
-    # ---------- BASE SCORES ----------
     scores = {
         "cut": style["cut_bias"],
         "dissolve": style["dissolve_bias"],
@@ -33,13 +34,13 @@ def recommend_transition(scene_feat, scene_emo, style_name):
         "whip_pan": style["whip_bias"]
     }
 
-    # ---------- STATIC / ESTABLISHING SCENE ----------
+    # Static establishing shots
     if scene_type == "static_establishing":
         preferred = style["static_preference"]
         scores[preferred] += 0.35
-        scores["whip_pan"] = 0.01  # almost never for static shots
+        scores["whip_pan"] = 0.01
 
-    # ---------- MOTION-BASED LOGIC ----------
+    # Motion-driven logic
     elif motion >= style["fast_cut_motion"]:
         scores["cut"] += 0.25
         scores["whip_pan"] += 0.1
@@ -47,14 +48,13 @@ def recommend_transition(scene_feat, scene_emo, style_name):
         scores["dissolve"] += 0.15
         scores["fade"] += 0.1
 
-    # ---------- AUDIO-BASED LOGIC ----------
+    # Audio-driven logic
     if audio > 0.03 or tempo > 110:
         scores["cut"] += 0.1
     else:
         scores["fade"] += 0.1
 
-    # ---------- EMOTION / MOOD LOGIC ----------
-    # If face emotion missing, rely on color mood
+    # Emotion / mood logic
     if face_emotion == "no_face":
         if mood == "dark":
             scores["fade"] += 0.1
@@ -63,13 +63,12 @@ def recommend_transition(scene_feat, scene_emo, style_name):
         elif mood == "warm":
             scores["cut"] += 0.05
     else:
-        # face emotion present (future-proof)
         scores["cut"] += 0.05
 
-    # ---------- NORMALIZE ----------
+    # Normalize
     total = sum(scores.values())
     for k in scores:
-        scores[k] = scores[k] / total
+        scores[k] /= total
 
     best = max(scores, key=scores.get)
     confidence = round(scores[best], 3)
@@ -101,14 +100,3 @@ def run_transition_engine(features_path, emotions_path, output_path, style_name=
         json.dump(results, f, indent=2)
 
     return results
-
-
-if __name__ == "__main__":
-    run_transition_engine(
-        features_path="outputs\\sample1\\scene_features.json",
-        emotions_path="outputs\\sample1\\scene_emotions.json",
-        output_path="outputs\\sample1\\scene_transitions.json",
-        style_name="nolan"
-    )
-
-    print("Robust scene transition recommendations generated")

@@ -2,25 +2,27 @@ import librosa
 import numpy as np
 
 
-def load_audio(audio_path, sr=22050):
-    return librosa.load(audio_path, sr=sr)
-
-
-def audio_features_for_scene(y, sr, scene):
+def scene_audio_features(video_path, start_time, end_time):
     """
-    Computes audio energy and tempo for a scene.
+    Attempts to load audio directly from video.
+    If audio is missing, returns safe default values.
     """
-    start_sample = int(scene["start"] * sr)
-    end_sample = int(scene["end"] * sr)
 
-    segment = y[start_sample:end_sample]
-    if len(segment) == 0:
+    try:
+        y, sr = librosa.load(
+            video_path,
+            offset=start_time,
+            duration=max(0.1, end_time - start_time)
+        )
+
+        if len(y) == 0:
+            return 0.0, 0.0
+
+        energy = float(np.mean(np.square(y)))
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+
+        return energy, float(tempo)
+
+    except Exception:
+        # Graceful fallback if video has no audio stream
         return 0.0, 0.0
-
-    rms = np.mean(librosa.feature.rms(y=segment))
-    onset_env = librosa.onset.onset_strength(y=segment, sr=sr)
-
-    tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=sr)
-    tempo = float(tempo[0]) if len(tempo) > 0 else 0.0
-
-    return float(rms), tempo

@@ -1,31 +1,31 @@
 import json
-from motion_analysis import scene_motion_score
-from audio_analysis import load_audio, audio_features_for_scene
+
+from src.motion_analysis import scene_motion_score
+from src.audio_analysis import scene_audio_features
 
 
-def compute_scene_features(video_path, audio_path, scenes_json, output_path):
+def compute_scene_features(video_path, scenes_json, output_path):
+    """
+    Computes motion and audio features for each detected scene.
+    Audio extraction is fully optional and safe.
+    """
+
     with open(scenes_json, "r") as f:
         scenes = json.load(f)
-
-    y, sr = load_audio(audio_path)
 
     features = {}
 
     for scene in scenes:
-        scene_id = f"scene_{scene['scene_id']}"
+        scene_id = scene["scene_id"]
+        start = scene["start"]
+        end = scene["end"]
 
-        motion_mean, motion_std = scene_motion_score(
-            video_path, scene
-        )
+        motion = scene_motion_score(video_path, start, end)
+        audio_energy, tempo = scene_audio_features(video_path, start, end)
 
-        audio_energy, tempo = audio_features_for_scene(
-            y, sr, scene
-        )
-
-        features[scene_id] = {
-            "motion_mean": round(motion_mean, 3),
-            "motion_std": round(motion_std, 3),
-            "audio_energy": round(audio_energy, 4),
+        features[f"scene_{scene_id}"] = {
+            "motion_mean": round(motion, 4),
+            "audio_energy": round(audio_energy, 6),
             "tempo": round(tempo, 2)
         }
 
@@ -34,13 +34,3 @@ def compute_scene_features(video_path, audio_path, scenes_json, output_path):
 
     return features
 
-
-if __name__ == "__main__":
-    compute_scene_features(
-        video_path="sample_videos\\test.mp4",
-        audio_path="outputs\\sample1\\audio.wav",
-        scenes_json="outputs\\sample1\\scenes.json",
-        output_path="outputs\\sample1\\scene_features.json"
-    )
-
-    print("Scene-level motion & audio features generated")

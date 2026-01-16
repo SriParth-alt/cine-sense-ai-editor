@@ -1,119 +1,93 @@
+import cv2
 import json
 import os
-import cv2
-from scenedetect import open_video, SceneManager
-from scenedetect.detectors import ContentDetector
-from moviepy.editor import VideoFileClip
 
 
-def detect_scenes(video_path, output_json_path, threshold=15.0):
+def detect_scenes(video_path, output_json):
     """
-    Detect scenes using content-based scene detection.
-    Always returns at least one scene (fallback).
+    Detect scenes and store start frame index for each scene.
     """
-    video = open_video(video_path)
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
 
-    scene_manager = SceneManager()
-    scene_manager.add_detector(ContentDetector(threshold=threshold))
+    scenes = []
+    scene_id = 0
+    start_frame = 0
 
-    scene_manager.detect_scenes(video)
-    scene_list = scene_manager.get_scene_list()
+    prev_gray = None
+    frame_idx = 0
 
-    scenes_out = []
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-    for i, (start, end) in enumerate(scene_list):
-        scenes_out.append({
-            "scene_id": i,
-            "start": round(start.get_seconds(), 3),
-            "end": round(end.get_seconds(), 3)
-        })
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # -------- FALLBACK (IMPORTANT) --------
-    # If no scenes detected, treat whole video as one scene
-    if not scenes_out:
-        clip = VideoFileClip(video_path)
-        scenes_out = [{
-            "scene_id": 0,
-            "start": 0.0,
-            "end": round(clip.duration, 3)
-        }]
-        clip.close()
+        if prev_gray is not None:
+            diff = cv2.absdiff(prev_gray, gray)
+            score = diff.mean()
 
-    # Save scenes.json
-    os.makedirs(os.path.dirname(output_json_path), exist_ok=True)
-    with open(output_json_path, "w") as f:
-        json.dump(scenes_out, f, indent=2)
+            if score > 30:  # cut threshold
+                scenes.append({
+                    "scene_id": scene_id,
+                    "start": round(start_frame / fps, 3),
+                    "end": round(frame_idx / fps, 3),
+                    "start_frame": start_frame
+                })
+                scene_id += 1
+                start_frame = frame_idx
 
-    return scenes_out
+        prev_gray = gray
+        frame_idx += 1
+
+    # final scene
+    scenes.append({
+        "scene_id": scene_id,
+        "start": round(start_frame / fps, 3),
+        "end": round(frame_idx / fps, 3),
+        "start_frame": start_frame
+    })
+
+    cap.release()
+
+    with open(output_json, "w") as f:
+        json.dump(scenes, f, indent=2)
+
+    return scenes
 
 
-def generate_scene_thumbnails(
-    video_path,
-    scenes,
-    output_dir,
-    resize=(320, 180)
-):
+def generate_scene_thumbnails(video_path, scenes, output_dir):
     """
-    Generate one thumbnail per scene using the middle frame.
+    Generate thumbnails by sequentially reading frames.
+    This works reliably for ALL video types.
     """
     os.makedirs(output_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    for scene in scenes:
-        scene_id = scene["scene_id"]
-        start = scene["start"]
-        end = scene["end"]
+    # Map scene start frames
+    scene_frames = {
+        scene["start_frame"]: scene["scene_id"]
+        for scene in scenes
+    }
 
-        # Middle timestamp of scene
-        mid_time = (start + end) / 2.0
-        frame_number = int(mid_time * fps)
+    frame_idx = 0
 
-        # Safety clamp
-        frame_number = max(0, min(frame_number, total_frames - 1))
-
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+    while cap.isOpened():
         ret, frame = cap.read()
-
         if not ret:
-            print(f"[WARN] Could not read frame for scene {scene_id}")
-            continue
+            break
 
-        if resize:
-            frame = cv2.resize(frame, resize)
+        if frame_idx in scene_frames:
+            scene_id = scene_frames[frame_idx]
+            thumb_path = os.path.join(
+                output_dir,
+                f"scene_{scene_id:02d}.jpg"
+            )
+            cv2.imwrite(thumb_path, frame)
 
-        out_path = os.path.join(
-            output_dir,
-            f"scene_{scene_id:02d}.jpg"
-        )
-        cv2.imwrite(out_path, frame)
+        frame_idx += 1
 
     cap.release()
 
-
-# -------------------- MAIN RUNNER --------------------
-
-if __name__ == "__main__":
-    video_path = "sample_videos\\test.mp4"
-    scenes_json_path = "outputs\\sample1\\scenes.json"
-    thumbnails_dir = "outputs\\sample1\\scene_thumbnails"
-
-    print("Detecting scenes...")
-    scenes = detect_scenes(
-        video_path,
-        scenes_json_path,
-        threshold=15.0
-    )
-
-    print(f"Detected {len(scenes)} scenes")
-
-    print("Generating scene thumbnails...")
-    generate_scene_thumbnails(
-        video_path,
-        scenes,
-        thumbnails_dir
-    )
-
-    print("Scene detection + thumbnails complete")
