@@ -1,0 +1,14 @@
+{
+  "scene_0": {
+    "recommended_transition": "cut",
+    "confidence": 0.724,
+    "style": "nolan",
+    "scene_type": "dynamic_scene"
+  },
+  "scene_1": {
+    "recommended_transition": "cut",
+    "confidence": 0.724,
+    "style": "nolan",
+    "scene_type": "dynamic_scene"
+  }
+}
