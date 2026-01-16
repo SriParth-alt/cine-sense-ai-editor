@@ -1,0 +1,12 @@
+{
+  "scene_0": {
+    "face_emotion": "no_face",
+    "confidence": 0.0,
+    "color_mood": "neutral"
+  },
+  "scene_1": {
+    "face_emotion": "no_face",
+    "confidence": 0.0,
+    "color_mood": "neutral"
+  }
+}
